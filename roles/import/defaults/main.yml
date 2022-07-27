@@ -1,0 +1,6 @@
+---
+registry:
+repositories: []
+
+pah_host: "pah.ansible.show"
+pah_credential: "Private Automation Hub"

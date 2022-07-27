@@ -1,0 +1,5 @@
+{% if ee_python is defined and ee_python|length > 0 %}
+{% for requirement in ee_python %}
+{{ requirement }}
+{% endfor %}
+{% endif %}

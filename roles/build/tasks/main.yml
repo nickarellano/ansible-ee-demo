@@ -1,0 +1,82 @@
+---
+- name: "Ensure the builder images are available"
+  containers.podman.podman_image:
+    name: "{{ item }}"
+    username: "{{ registry_username }}"
+    password: "{{ registry_password }}"
+    force: true
+  loop:
+    - "{{ ee_builder_image }}"
+    - "{{ ee_base_image }}"
+
+- name: "Ensure the build directory exists"
+  ansible.builtin.file:
+    path: "/tmp/{{ ee_image_name }}"
+    state: directory
+
+- name: "Ensure the environment files are present for building"
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/tmp/{{ ee_image_name }}/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - execution-environment.yml
+    - requirements.yml
+    - requirements.txt
+
+- name: "Ensure the image does not exist already"
+  containers.podman.podman_image:
+    name: "localhost/{{ ee_image_name }}"
+    state: absent
+    force: true
+
+- name: "Ensure the new execution environment is built"
+  ansible.builtin.command:
+    chdir: "/tmp/{{ ee_image_name }}"
+    cmd: "ansible-builder build --tag=localhost/{{ ee_image_name }}:{{ ee_version }}"
+  changed_when: true
+
+- name: "Ensure dangling images are pruned"
+  ansible.builtin.command:
+    cmd: "podman image prune --force"
+  changed_when: true
+
+- name: "Ensure the execution environment is pushed to automation hub"
+  containers.podman.podman_image:
+    name: "localhost/{{ ee_image_name }}"
+    tag: "{{ ee_version }}"
+    validate_certs: false
+    push: true
+    username: "{{ pah_username }}"
+    password: "{{ pah_password }}"
+
+- name: "Ensure the credential ID is set for private automation hub"
+  ansible.builtin.uri:
+    url: "https://{{ lookup('env', 'TOWER_HOST') }}/api/v2/credentials?name={{ pah_credential|replace(' ', '%20') }}&credential_type=17&page_size=1"
+    force_basic_auth: true
+    user: "{{ lookup('env', 'TOWER_USERNAME') }}"
+    password: "{{ lookup('env', 'TOWER_PASSWORD') }}"
+    validate_certs: false
+    method: "GET"
+    status_code: 200
+  changed_when: false
+  register: credential_lookup
+  delegate_to: localhost
+
+- name: "Ensure the execution environment version is in controller"
+  ansible.controller.execution_environment:
+    name: "{{ ee_image_name }}"
+    image: "{{ pah_host }}/{{ ee_image_name }}:{{ ee_version }}"
+    validate_certs: false
+    controller_username: "{{ lookup('env', 'TOWER_USERNAME') }}"
+    controller_password: "{{ lookup('env', 'TOWER_PASSWORD') }}"
+    controller_host: "{{ lookup('env', 'TOWER_HOST') }}"
+    credential: "{{ credential_lookup.json.results.0.id }}"
+  delegate_to: localhost
+
+- name: "Ensure the build directory is cleaned up"
+  ansible.builtin.file:
+    path: "/tmp/{{ ee_image_name }}"
+    state: absent

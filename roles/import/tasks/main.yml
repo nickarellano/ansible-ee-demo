@@ -1,0 +1,48 @@
+---
+- name: "Ensure the builder images are available"
+  containers.podman.podman_image:
+    name: "{{ registry }}/{{ item }}"
+    force: true
+  loop: "{{ repositories }}"
+
+- name: "Ensure all the images are retagged locally"
+  containers.podman.podman_tag:
+    image: "{{ registry }}/{{ item }}"
+    target_names:
+      - "localhost/{{ item.split('/')[1] }}"
+  loop: "{{ repositories }}"
+
+- name: "Ensure the execution environments are pushed to automation hub"
+  containers.podman.podman_image:
+    name: "localhost/{{ item.split('/')[1] }}"
+    tag: "latest"
+    validate_certs: false
+    push: true
+    username: "{{ pah_username }}"
+    password: "{{ pah_password }}"
+  loop: "{{ repositories }}"
+
+- name: "Ensure the credential ID is set for private automation hub"
+  ansible.builtin.uri:
+    url: "https://{{ lookup('env', 'TOWER_HOST') }}/api/v2/credentials?name={{ pah_credential|replace(' ', '%20') }}&credential_type=17&page_size=1"
+    force_basic_auth: true
+    user: "{{ lookup('env', 'TOWER_USERNAME') }}"
+    password: "{{ lookup('env', 'TOWER_PASSWORD') }}"
+    validate_certs: false
+    method: "GET"
+    status_code: 200
+  changed_when: false
+  register: credential_lookup
+  delegate_to: localhost
+
+- name: "Ensure the execution environment version is in controller"
+  ansible.controller.execution_environment:
+    name: "{{ item.split('/')[1] }}"
+    image: "{{ pah_host }}/{{ item.split('/')[1] }}:latest"
+    validate_certs: false
+    controller_username: "{{ lookup('env', 'TOWER_USERNAME') }}"
+    controller_password: "{{ lookup('env', 'TOWER_PASSWORD') }}"
+    controller_host: "{{ lookup('env', 'TOWER_HOST') }}"
+    credential: "{{ credential_lookup.json.results.0.id }}"
+  delegate_to: localhost
+  loop: "{{ repositories }}"

@@ -1,0 +1,10 @@
+---
+{% if ee_collections is defined and ee_collections|length > 0 %}
+collections:
+{% for collection in ee_collections %}
+  - name: {{ collection.name }}
+{% if collection.version is defined %}
+    version: {{ collection.version }}
+{% endif %}
+{% endfor %}
+{% endif %}

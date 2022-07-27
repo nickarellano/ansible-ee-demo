@@ -1,0 +1,30 @@
+---
+version: {{ ee_version }}
+
+build_arg_defaults:
+    EE_BUILDER_IMAGE: {{ ee_builder_image }}
+    EE_BASE_IMAGE: {{ ee_base_image }}
+
+dependencies:
+{% if ee_collections is defined %}
+    galaxy: requirements.yml
+{% endif %}
+{% if ee_python is defined %}
+    python: requirements.txt
+{% endif %}
+
+{% if ee_prepend is defined or ee_append is defined %}
+additional_build_steps:
+{% if ee_prepend is defined and ee_prepend|length > 0 %}
+  prepend:
+{% for item in ee_prepend %}
+    - {{ item }}
+{% endfor %}
+{% endif %}
+{% if ee_append is defined and ee_append|length > 0 %}
+  append:
+{% for item in ee_append %}
+    - {{ item }}
+{% endfor %}
+{% endif %}
+{% endif %}

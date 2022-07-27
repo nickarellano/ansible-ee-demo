@@ -1,0 +1,7 @@
+---
+- name: "EE Demo: Importing Images from Quay"
+  hosts: all
+  gather_facts: false
+
+  roles:
+    - import

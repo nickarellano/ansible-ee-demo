@@ -1,0 +1,9 @@
+---
+- name: "EE Demo: Cleanup"
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: "Ensure all podman images are cleaned up"
+      ansible.builtin.command:
+        cmd: "podman image prune --all --force"

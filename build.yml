@@ -1,0 +1,7 @@
+---
+- name: "EE Demo: Building Execution Environments"
+  hosts: all
+  gather_facts: false
+
+  roles:
+    - build
